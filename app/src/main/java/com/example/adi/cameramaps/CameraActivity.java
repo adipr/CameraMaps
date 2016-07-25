@@ -1,27 +1,24 @@
 package com.example.adi.cameramaps;
 
 import android.app.Activity;
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.Point;
 import android.graphics.PorterDuff;
-import android.graphics.Rect;
 import android.hardware.Camera;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
-import android.provider.ContactsContract;
 import android.util.Log;
+import android.view.Display;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.animation.Animation;
-import android.view.animation.RotateAnimation;
 import android.widget.ImageView;
 
 import java.io.IOException;
@@ -49,12 +46,12 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
         surfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
 
         compassSurfaceView = (SurfaceView)findViewById(R.id.camera_activity_compass_surface_view);
-//        surfaceViewRunnable = new CompassSurfaceViewRunnable(compassSurfaceView);
+        surfaceViewRunnable = new CompassSurfaceViewRunnable(compassSurfaceView);
 
          // notify when underlying surface is created or destroyed
         surfaceHolder.addCallback(this);
 
-        compassImageView = (ImageView)findViewById(R.id.compass_image_view);
+//        compassImageView = (ImageView)findViewById(R.id.compass_image_view);
 
         mySensorListener = new MySensorListener();
     }
@@ -91,44 +88,49 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
     @Override
     protected void onStop() {
         super.onStop();
-//        surfaceViewRunnable.pause();
+        surfaceViewRunnable.pause();
         mySensorListener.stopSensor();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-//        surfaceViewRunnable.resume();
+        surfaceViewRunnable.resume();
         mySensorListener.startSensor();
 
+    }
+
+    public void setDegree(float degree){
+        this.degree = degree;
     }
 
     public class CompassSurfaceViewRunnable  implements Runnable{
         Thread thread = null;
         SurfaceHolder holder;
         boolean isOK = false;
-        float degree = 0;
-
+        int imageDimension;
+        float widthPercent = 0.3f;
         public CompassSurfaceViewRunnable(SurfaceView surfaceView) {
             holder = surfaceView.getHolder();
             holder.setFormat(PixelFormat.TRANSLUCENT);
             holder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
             surfaceView.setZOrderMediaOverlay(true);
 
+            Display display = getWindowManager().getDefaultDisplay();
+            Point size = new Point();
+            display.getSize(size);
+            imageDimension = (int) (size.x * widthPercent);
         }
 
         @Override
         public void run() {
-            int x = 0, y = 0;
-            int width = 500;
-            int height = 500;
+
             while (isOK){
-                Log.d("CompassSurface", "RUNNING");
-                try {
-                    Thread.sleep(50);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+//                try {
+//                    Thread.sleep(50);
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
                 if(!holder.getSurface().isValid()){
                     continue;
                 }
@@ -139,11 +141,11 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
 
                     Bitmap icon = BitmapFactory.decodeResource(getResources(),
                             R.drawable.compass_icon);
+                    // rotate and scale bitmap
+                    Matrix matrix = new Matrix();
+                    matrix.setRotate(- degree, imageDimension /2, imageDimension /2);
+                    canvas.drawBitmap(Bitmap.createScaledBitmap(icon, imageDimension, imageDimension, false), matrix, new Paint());
 
-                    Rect dest = new Rect(0, 0, 400, 400);
-                    Paint paint = new Paint();
-                    paint.setFilterBitmap(true);
-                    canvas.drawBitmap(rotateBitmap(icon, degree), null, dest, paint);
                     holder.unlockCanvasAndPost(canvas);
                 }
             }
@@ -168,16 +170,6 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
             thread.start();
         }
 
-        public Bitmap rotateBitmap(Bitmap source, float angle)
-        {
-            Matrix matrix = new Matrix();
-            matrix.postRotate(angle);
-            return Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(), matrix, true);
-        }
-
-        public void setDegree(float degree){
-            this.degree = degree;
-        }
     }
 
     private class MySensorListener implements SensorEventListener{
@@ -203,18 +195,18 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
             // get the angle around the z-axis rotated
             degree = Math.round(sensorEvent.values[0]);
             Log.d("SensorListener", "Degree: " + degree);
-
-            RotateAnimation ra = new RotateAnimation(
-                    currentDegree,
-                            -degree,
-                    Animation.RELATIVE_TO_SELF, 0.5f,
-                    Animation.RELATIVE_TO_SELF,
-            0.5f);
-
-            ra.setDuration(210);
-            ra.setFillAfter(true);
-            compassImageView.startAnimation(ra);
-            currentDegree = -degree;
+//
+//            RotateAnimation ra = new RotateAnimation(
+//                    currentDegree,
+//                            -degree,
+//                    Animation.RELATIVE_TO_SELF, 0.5f,
+//                    Animation.RELATIVE_TO_SELF,
+//            0.5f);
+//
+//            ra.setDuration(210);
+//            ra.setFillAfter(true);
+//            compassImageView.startAnimation(ra);
+//            currentDegree = -degree;
 
 
 

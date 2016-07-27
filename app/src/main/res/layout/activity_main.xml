@@ -17,4 +17,13 @@
         android:text="Start camera activity"
         android:layout_alignParentBottom="true"
         />
+
+    <Button
+        android:id="@+id/main_activity_start_maps_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Start maps activity"
+
+        android:layout_above="@+id/main_activity_start_camera_button"
+        android:layout_centerHorizontal="true" />
 </RelativeLayout>

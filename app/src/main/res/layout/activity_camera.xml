@@ -17,6 +17,7 @@
         android:layout_height="wrap_content"
         android:src="@drawable/arrow"
         android:layout_alignParentBottom="true"
+        android:layout_marginBottom="20dp"
         android:layout_centerHorizontal="true" />
 
     <TextView
@@ -27,6 +28,42 @@
         android:textSize="20dp"
         android:textColor="@color/colorAccent"/>
 
+    <Switch
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Camera"
+        android:id="@+id/activity_camera_switch"
+        android:shadowColor="#255fe6"
+        android:layout_marginTop="20dp"
+        android:layout_marginRight="20dp"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentEnd="true" />
+
+    <TextView
+        android:id="@+id/activity_camera_coordinates_text_view"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:textSize="20dp"
+        android:background="@color/white"/>
+
+    <TextView
+        android:id="@+id/camera_activity_dest_long_lat"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentRight="true"
+        android:background="@color/colorPrimary"/>
+
+    <TextView
+        android:id="@+id/camera_activity_angle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:background="@color/white"
+        android:textSize="25dp"
+        android:layout_centerVertical="true"/>
 
 
 </RelativeLayout>

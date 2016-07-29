@@ -1,14 +1,12 @@
 package com.example.adi.cameramaps;
 
 import android.Manifest;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.hardware.GeomagneticField;
 import android.location.Location;
-import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Build;
-import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
@@ -28,11 +26,10 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
-
-import java.io.Serializable;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener{
 
@@ -40,7 +37,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private LocationManager locationManager;
     private MyLocationListener locationListener;
     private Marker currentLocationMarker;
-    private Marker destionationLocationMarker;
+    private Marker destinationLocationMarker;
     private double destinationLongitude;
     private double destinationLatitude;
     private double currentLocationLongitude;
@@ -49,7 +46,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private Button startRoutingButton;
     private TextView coortinatesTextView;
     private boolean isLocationManagerSet = false;
-    private boolean isDeviceConnectedToGPS = false;
+
+    private GeomagneticField geomagneticField;
 
 
     @Override
@@ -61,17 +59,18 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         startRoutingButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if(locationListener.isDeviceConnectedToGPS() && destionationLocationMarker != null){
+                if(locationListener.isDeviceConnectedToGPS() && destinationLocationMarker != null){
                     Intent intent = new Intent(MapsActivity.this, CameraActivity.class);
                     intent.putExtra("destinationLongitude", destinationLongitude);
                     intent.putExtra("destinationLatitude", destinationLatitude);
                     intent.putExtra("currentLongitude", currentLocationLongitude);
                     intent.putExtra("currentLatitude", currentLocationLatitude);
+                    intent.putExtra("declination", geomagneticField.getDeclination());
                     startActivity(intent);
                 }else if(!locationListener.isDeviceConnectedToGPS()){
-                    Toast.makeText(MapsActivity.this, "Device not connected to GPS", Toast.LENGTH_LONG).show();
-                }else if(destionationLocationMarker == null){
-                    Toast.makeText(MapsActivity.this, "Destination point not defined", Toast.LENGTH_LONG).show();
+                    Toast.makeText(MapsActivity.this, "Device not connected to GPS", Toast.LENGTH_SHORT).show();
+                }else if(destinationLocationMarker == null){
+                    Toast.makeText(MapsActivity.this, "Destination point not defined", Toast.LENGTH_SHORT).show();
                 }
             }
         });
@@ -151,12 +150,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
 
-
+    /**
+     * this function is used to set current location, it is used to set initial current location
+     * @param location
+     * @param title
+     */
     public void setCurrentLocation(Location location, String title) {
-        // Add a marker in Sydney and move the camera
-
         if(coortinatesTextView != null){
-            coortinatesTextView.setText("long: " + location.getLongitude() + "\nlat: " + location.getLatitude());
+            if(location != null)
+                coortinatesTextView.setText("long: " + location.getLongitude() + "\nlat: " + location.getLatitude());
         }
 
         LatLng currentLocation = new LatLng(location.getLatitude(), location.getLongitude());
@@ -169,11 +171,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         mMap.moveCamera(CameraUpdateFactory.newLatLng(currentLocation));
         mMap.animateCamera(CameraUpdateFactory.zoomIn());
-        mMap.animateCamera(CameraUpdateFactory.zoomTo(15), 4000, null);
+        mMap.animateCamera(CameraUpdateFactory.zoomTo(15), 2000, null);
     }
 
+    /**
+     * this function is used to change current location of marker and to store that new location
+     * in current location variable
+     * @param location
+     * @param title
+     */
     public void changeCurrentLocation(Location location, String title){
+        setGeomagneticField(location);
         LatLng currentLocation = new LatLng(location.getLatitude(), location.getLongitude());
+
         if(currentLocationMarker != null){
             currentLocationMarker.remove();
         }
@@ -182,19 +192,31 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .title(title));
         currentLocationLatitude = location.getLatitude();
         currentLocationLongitude = location.getLongitude();
-//        mMap.moveCamera(CameraUpdateFactory.newLatLng(currentLocation));
     }
 
+    /**
+     * when user clicks on map new marker is added if one does not exist
+     * if marker is added, that marker is removed and new is added
+     * there is no option to change marker location, to change marker location the old need to be removed
+     * and after that, new marker needs to be added
+     * @param location
+     */
     public void setDestinationLocation(LatLng location){
-        if(destionationLocationMarker != null){
-            destionationLocationMarker.remove();
+        if(destinationLocationMarker != null){
+            destinationLocationMarker.remove();
         }
         destinationLatitude = location.latitude;
         destinationLongitude = location.longitude;
-        destionationLocationMarker = mMap.addMarker(new MarkerOptions().position(location).title("Destination"));
+        destinationLocationMarker = mMap.addMarker(new MarkerOptions()
+                .position(location)
+                .title("Destination")
+                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE)));
     }
 
-    // get last known location
+    /**
+     * this function is used to set current location of device based on last known location
+     * @param bundle
+     */
     @Override
     public void onConnected(@Nullable Bundle bundle) {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -205,6 +227,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 } else {
                     Location mLastLocation = LocationServices.FusedLocationApi.getLastLocation(
                             googleApiClient);
+
                     setCurrentLocation(mLastLocation, "Last known location");
                 }
             } else {
@@ -255,6 +278,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         locationManager.removeUpdates(locationListener);
         isLocationManagerSet = false;
         super.onStop();
+    }
+
+    public void setGeomagneticField(Location loaction){
+        geomagneticField = new GeomagneticField((float)loaction.getLatitude(), (float)loaction.getLongitude(),
+                (float)loaction.getAltitude(), System.currentTimeMillis());
     }
 
 }

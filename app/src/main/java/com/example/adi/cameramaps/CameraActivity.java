@@ -1,9 +1,7 @@
 package com.example.adi.cameramaps;
 
-import android.*;
 import android.animation.ObjectAnimator;
 import android.app.Activity;
-import android.content.pm.PackageManager;
 import android.hardware.Camera;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -11,15 +9,16 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.location.LocationManager;
 import android.os.Bundle;
-import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.Animation;
 import android.view.animation.RotateAnimation;
 import android.widget.CompoundButton;
 import android.widget.ImageView;
+import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 
@@ -55,7 +54,16 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
     private TextView coortinatesTextView;
     private TextView destinationLongLatTextView;
     private TextView angleTextView;
+    private TextView newAngleTextView;
     private boolean isLocationManagerSet = false;
+
+    private float declination; // positive means the magnetic field is rotated east that much from true north, negative is opposite
+
+
+    private double bearing;
+
+    private SeekBar seekBar;
+    private float errorDegree = 20;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,12 +79,19 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
 
         destinationLongLatTextView = (TextView)findViewById(R.id.camera_activity_dest_long_lat);
         angleTextView = (TextView)findViewById(R.id.camera_activity_angle);
+        newAngleTextView = (TextView)findViewById(R.id.camera_activity_new_angle);
+
 
         Bundle bundle = getIntent().getExtras();
-        destinationLongitude = bundle.getDouble("destinationLongitude");
-        destinationLatitude = bundle.getDouble("destinationLatitude");
-        currentLocationLongitude = bundle.getDouble("currentLongitude");
-        currentLocationLatitude = bundle.getDouble("currentLatitude");
+        try{
+            destinationLongitude     = bundle.getDouble("destinationLongitude");
+            destinationLatitude      = bundle.getDouble("destinationLatitude");
+            currentLocationLongitude = bundle.getDouble("currentLongitude");
+            currentLocationLatitude  = bundle.getDouble("currentLatitude");
+            declination              = bundle.getFloat("declination");
+        }catch (Exception e){
+            e.printStackTrace();
+        }
 
         currentPoint = new Point(currentLocationLatitude, currentLocationLongitude);
         destinationPoint = new Point(destinationLatitude, destinationLongitude);
@@ -111,12 +126,34 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
         });
 
         mySensorListener = new MySensorListener();
+
+        seekBar = (SeekBar)findViewById(R.id.seekBar);
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
+                newAngleTextView.setText(seekBar.getScrollX() + "\ni: " + i);
+                errorDegree = i;
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
+            }
+        });
+
+//        compass = new Compass();
     }
 
     @Override
     public void surfaceCreated(SurfaceHolder surfaceHolder) {
         startCamera();
         mySensorListener.startSensor();
+//        compass.start();
     }
 
     @Override
@@ -128,11 +165,12 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
     public void surfaceDestroyed(SurfaceHolder surfaceHolder) {
         stopCamera();
         mySensorListener.stopSensor();
+//        compass.stop();
     }
 
     private void startCamera(){
         if(camera == null){
-            camera = Camera.open();
+            camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_BACK);
             Camera.Parameters parameters = camera.getParameters();
             parameters.setPreviewFrameRate(20);
             parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
@@ -173,13 +211,15 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
 
     private class MySensorListener implements SensorEventListener{
         private SensorManager mSensorManager;
-        private int animationDuration = 800;
+        private int animationDuration = 8000;
         private float currentDegree = 0f;
         private float degree;
         private float currentDeviceTilt;
-        private float imageTilt = 0;
-        private float threshold = 60;
+        private float imageTilt = 60;
+        private float threshold = 90;
         private float reverseValue = 1;
+        private float distance = 0;
+
 
         public MySensorListener() {
             mSensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
@@ -198,7 +238,11 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
         public void onSensorChanged(SensorEvent sensorEvent) {
             // get the angle around the z-axis rotated
             degree = Math.round(sensorEvent.values[0]);
-            degree = Math.round(sensorEvent.values[0]) - (360 - (float) EarthCalc.getBearing(currentPoint, destinationPoint));
+            bearing = EarthCalc.getBearing(currentPoint, destinationPoint);
+            distance = (float) EarthCalc.getDistance(currentPoint, destinationPoint);
+
+            degree = Math.round(sensorEvent.values[0]) + (float)bearing + declination + errorDegree;
+
             currentDeviceTilt = Math.round(sensorEvent.values[1]);
 
             if(degree > threshold && degree < (360 - threshold)){
@@ -209,19 +253,22 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
                 reverseValue = 1;
             }
 
-            if(-179.9 < currentDeviceTilt && currentDeviceTilt < -90){
-                currentDeviceTilt = -179 + (currentDeviceTilt * -1);
+
+            if(-179.99 < currentDeviceTilt && currentDeviceTilt < -90){
+                currentDeviceTilt = -179.99f + (currentDeviceTilt * -1);
             }
 
             // rotate for device tilt
             ObjectAnimator animation = ObjectAnimator.ofFloat(arrow, "rotationX",
                     imageTilt - (currentDeviceTilt / 6 * reverseValue), 0f);
             animation.setDuration(animationDuration);
+            animation.setInterpolator(new AccelerateDecelerateInterpolator());
             animation.start();
             currentDegree = -degree;
 
 
-            // rotate for compass
+
+//            // rotate for compass
             RotateAnimation ra = new RotateAnimation(
                     currentDegree,
                     -degree,
@@ -235,18 +282,23 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
 
             debugTextView.setText("Sensors data\n0: " + sensorEvent.values[0] +
                 "\n1: " + sensorEvent.values[1] +
-                    "\n2: " + sensorEvent.values[2]);
+                    "\n2: " + sensorEvent.values[2] +
+            "\ndeg: " + degree +
+            "\ndist: "  + distance);
 
-            if(angleTextView != null){
-                angleTextView.setText("" + EarthCalc.getBearing(currentPoint, destinationPoint));
-            }
+
 
 
         }
 
         @Override
-        public void onAccuracyChanged(Sensor sensor, int i) {
-
+        public void onAccuracyChanged(Sensor sensor, int accuracy) {
+            if (sensor.getType() == Sensor.TYPE_ORIENTATION && accuracy == SensorManager.SENSOR_STATUS_UNRELIABLE) {
+                Log.w("CameraActivity", "Compass data unreliable");
+                newAngleTextView.setText("\nCompass unreliable");
+            }else{
+                newAngleTextView.setText("\nCompass reliable");
+            }
         }
     }
 
@@ -260,9 +312,17 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback{
     }
 
     public void updateCurrentPoint(double longitude, double latitude){
+        currentLocationLatitude = latitude;
+        currentLocationLongitude = longitude;
         currentPoint = new Point(latitude, longitude);
         if(angleTextView != null){
-            angleTextView.setText("" + EarthCalc.getBearing(currentPoint, destinationPoint));
+            angleTextView.setText(String.valueOf(bearing) + "\n decl:" + declination);
         }
     }
+
+    public void setNewAngle(double angle){
+//        0.setText("New angle\n" + String.valueOf(angle));
+    }
+
+
 }
